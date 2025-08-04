@@ -4,10 +4,14 @@ import Link from 'next/link';
 import { useState, useEffect } from 'react';
 import { getShopInfo } from '@/lib/api';
 import type { Shop } from '@/types/shop';
+import { useAuth } from '@/contexts/AuthContext';
+import LoginModal from './LoginModal';
 
 export default function Header() {
   const [shop, setShop] = useState<Shop | null>(null);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const [showLoginModal, setShowLoginModal] = useState(false);
+  const { user, logout, loading } = useAuth();
 
   useEffect(() => {
     const fetchShop = async () => {
@@ -56,6 +60,45 @@ export default function Header() {
             <Link href="/contact" className="text-gray-700 hover:text-blue-600 transition-colors">
               Liên hệ
             </Link>
+            
+            {/* Auth Section */}
+            {loading ? (
+              <div className="text-gray-500">...</div>
+            ) : user ? (
+              <div className="flex items-center space-x-4">
+                <div className="flex items-center space-x-2">
+                  {user.avatar && (
+                    <img 
+                      src={user.avatar} 
+                      alt={user.full_name}
+                      className="w-8 h-8 rounded-full object-cover"
+                    />
+                  )}
+                  <div className="text-sm">
+                    <div className="font-medium text-gray-900">{user.full_name}</div>
+                    <div className="text-green-600 font-semibold">
+                      {new Intl.NumberFormat('vi-VN', {
+                        style: 'currency',
+                        currency: 'VND'
+                      }).format(user.balance)}
+                    </div>
+                  </div>
+                </div>
+                <button
+                  onClick={logout}
+                  className="text-red-600 hover:text-red-800 text-sm"
+                >
+                  Đăng xuất
+                </button>
+              </div>
+            ) : (
+              <button
+                onClick={() => setShowLoginModal(true)}
+                className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors"
+              >
+                Đăng nhập
+              </button>
+            )}
           </nav>
 
           {/* Mobile menu button */}
@@ -91,10 +134,59 @@ export default function Header() {
               <Link href="/contact" className="block px-3 py-2 text-gray-700 hover:text-blue-600 transition-colors">
                 Liên hệ
               </Link>
+              
+              {/* Mobile Auth */}
+              {user ? (
+                <div className="px-3 py-2 border-t">
+                  <div className="flex items-center space-x-2 mb-2">
+                    {user.avatar && (
+                      <img 
+                        src={user.avatar} 
+                        alt={user.full_name}
+                        className="w-8 h-8 rounded-full object-cover"
+                      />
+                    )}
+                    <div className="text-sm">
+                      <div className="font-medium text-gray-900">{user.full_name}</div>
+                      <div className="text-green-600 font-semibold">
+                        {new Intl.NumberFormat('vi-VN', {
+                          style: 'currency',
+                          currency: 'VND'
+                        }).format(user.balance)}
+                      </div>
+                    </div>
+                  </div>
+                  <button
+                    onClick={logout}
+                    className="text-red-600 hover:text-red-800 text-sm"
+                  >
+                    Đăng xuất
+                  </button>
+                </div>
+              ) : (
+                <div className="px-3 py-2 border-t">
+                  <button
+                    onClick={() => setShowLoginModal(true)}
+                    className="w-full bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors"
+                  >
+                    Đăng nhập
+                  </button>
+                </div>
+              )}
             </div>
           </div>
         )}
       </div>
+      
+      {/* Login Modal */}
+      <LoginModal 
+        isOpen={showLoginModal}
+        onClose={() => setShowLoginModal(false)}
+        onSuccess={() => {
+          setShowLoginModal(false);
+          setIsMenuOpen(false);
+        }}
+      />
     </header>
   );
 }

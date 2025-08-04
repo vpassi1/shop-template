@@ -2,6 +2,8 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
+import { useAuth } from '@/contexts/AuthContext';
+import LoginModal from '@/components/LoginModal';
 
 interface CartItem {
   product_id: number;
@@ -17,6 +19,17 @@ export default function CheckoutPage() {
   const router = useRouter();
   const [cartItems, setCartItems] = useState<CartItem[]>([]);
   const [loading, setLoading] = useState(true);
+  const [showLoginModal, setShowLoginModal] = useState(false);
+  const [processing, setProcessing] = useState(false);
+  const [customerInfo, setCustomerInfo] = useState({
+    name: '',
+    phone: '',
+    email: '',
+    address: '',
+    note: ''
+  });
+  
+  const { user, refreshUser } = useAuth();
 
   useEffect(() => {
     // Lấy giỏ hàng từ localStorage
@@ -43,6 +56,76 @@ export default function CheckoutPage() {
 
   const handleContinueShopping = () => {
     router.push('/');
+  };
+
+  const handleInputChange = (field: string, value: string) => {
+    setCustomerInfo(prev => ({
+      ...prev,
+      [field]: value
+    }));
+  };
+
+  const processPayment = async () => {
+    if (!user) {
+      setShowLoginModal(true);
+      return;
+    }
+
+    if (!customerInfo.name || !customerInfo.phone || !customerInfo.address) {
+      alert('Vui lòng điền đầy đủ thông tin bắt buộc!');
+      return;
+    }
+
+    const totalAmount = getTotalPrice();
+    
+    if (user.balance < totalAmount) {
+      alert(`Số dư không đủ! Bạn cần ${formatPrice(totalAmount - user.balance)} nữa để thanh toán.`);
+      return;
+    }
+
+    setProcessing(true);
+
+    try {
+      // Lấy subdomain hiện tại
+      const subdomain = window.location.hostname.split('.')[0];
+      
+      const response = await fetch('https://chommo.store/api/payment/process-payment.php', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('chommo_token')}`
+        },
+        body: JSON.stringify({
+          amount: totalAmount,
+          subdomain: subdomain,
+          items: cartItems,
+          customer_info: customerInfo
+        })
+      });
+
+      const data = await response.json();
+
+      if (response.ok && data.success) {
+        // Thanh toán thành công
+        alert(`Thanh toán thành công! Mã đơn hàng: ${data.order_id}`);
+        
+        // Xóa giỏ hàng
+        localStorage.removeItem('cart');
+        
+        // Cập nhật thông tin user (số dư mới)
+        await refreshUser();
+        
+        // Chuyển về trang chủ
+        router.push('/');
+      } else {
+        alert(data.error || 'Có lỗi xảy ra khi thanh toán!');
+      }
+    } catch (error) {
+      console.error('Payment error:', error);
+      alert('Có lỗi xảy ra khi kết nối đến server thanh toán!');
+    } finally {
+      setProcessing(false);
+    }
   };
 
   if (loading) {
@@ -127,9 +210,41 @@ export default function CheckoutPage() {
 
           {/* Action Buttons */}
           <div className="space-y-3">
-            <button className="w-full bg-red-600 text-white py-3 px-6 rounded-lg font-medium hover:bg-red-700 transition-colors">
-              Đặt hàng ngay
-            </button>
+            {user ? (
+              <div className="space-y-2">
+                <div className="bg-green-50 p-3 rounded-lg">
+                  <div className="flex justify-between items-center text-sm">
+                    <span>Số dư hiện tại:</span>
+                    <span className="font-semibold text-green-600">
+                      {formatPrice(user.balance)}
+                    </span>
+                  </div>
+                  {user.balance < getTotalPrice() && (
+                    <div className="text-red-600 text-sm mt-1">
+                      ⚠️ Số dư không đủ để thanh toán
+                    </div>
+                  )}
+                </div>
+                <button 
+                  onClick={processPayment}
+                  disabled={processing || user.balance < getTotalPrice()}
+                  className={`w-full py-3 px-6 rounded-lg font-medium transition-colors ${
+                    processing || user.balance < getTotalPrice()
+                      ? 'bg-gray-400 cursor-not-allowed'
+                      : 'bg-red-600 hover:bg-red-700'
+                  } text-white`}
+                >
+                  {processing ? 'Đang xử lý...' : 'Thanh toán ngay'}
+                </button>
+              </div>
+            ) : (
+              <button 
+                onClick={() => setShowLoginModal(true)}
+                className="w-full bg-blue-600 text-white py-3 px-6 rounded-lg font-medium hover:bg-blue-700 transition-colors"
+              >
+                Đăng nhập để thanh toán
+              </button>
+            )}
             
             <button
               onClick={handleContinueShopping}
@@ -157,6 +272,8 @@ export default function CheckoutPage() {
                 <input
                   type="text"
                   required
+                  value={customerInfo.name}
+                  onChange={(e) => handleInputChange('name', e.target.value)}
                   className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
                   placeholder="Nhập họ và tên"
                 />
@@ -169,6 +286,8 @@ export default function CheckoutPage() {
                 <input
                   type="tel"
                   required
+                  value={customerInfo.phone}
+                  onChange={(e) => handleInputChange('phone', e.target.value)}
                   className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
                   placeholder="Nhập số điện thoại"
                 />
@@ -180,6 +299,8 @@ export default function CheckoutPage() {
                 </label>
                 <input
                   type="email"
+                  value={customerInfo.email}
+                  onChange={(e) => handleInputChange('email', e.target.value)}
                   className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
                   placeholder="Nhập email (tùy chọn)"
                 />
@@ -192,6 +313,8 @@ export default function CheckoutPage() {
                 <textarea
                   required
                   rows={3}
+                  value={customerInfo.address}
+                  onChange={(e) => handleInputChange('address', e.target.value)}
                   className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
                   placeholder="Nhập địa chỉ chi tiết"
                 />
@@ -203,6 +326,8 @@ export default function CheckoutPage() {
                 </label>
                 <textarea
                   rows={2}
+                  value={customerInfo.note}
+                  onChange={(e) => handleInputChange('note', e.target.value)}
                   className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
                   placeholder="Ghi chú thêm (tùy chọn)"
                 />
@@ -211,6 +336,13 @@ export default function CheckoutPage() {
           </div>
         </div>
       </div>
+      
+      {/* Login Modal */}
+      <LoginModal 
+        isOpen={showLoginModal}
+        onClose={() => setShowLoginModal(false)}
+        onSuccess={() => setShowLoginModal(false)}
+      />
     </div>
   );
 }

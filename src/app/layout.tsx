@@ -5,6 +5,7 @@ import Header from '@/components/Header';
 import Footer from '@/components/Footer';
 import { getShopInfo } from '@/lib/api';
 import type { Shop } from '@/types/shop';
+import { AuthProvider } from '@/contexts/AuthContext';
 
 const inter = Inter({ subsets: ['latin'] });
 
@@ -50,11 +51,13 @@ export default function RootLayout({
   return (
     <html lang="vi">
       <body className={`${inter.className} bg-gray-50 min-h-screen flex flex-col`}>
-        <Header />
-        <main className="flex-1">
-          {children}
-        </main>
-        <Footer />
+        <AuthProvider>
+          <Header />
+          <main className="flex-1">
+            {children}
+          </main>
+          <Footer />
+        </AuthProvider>
       </body>
     </html>
   );
