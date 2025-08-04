@@ -36,16 +36,40 @@ export interface Product {
   rating?: number;
   sold?: number;
   category?: Category;
+  variants?: ProductVariant[];
+  reviews?: Review[];
+  stats?: {
+    review_count: number;
+    average_rating: number;
+  };
+  shop?: {
+    id: number;
+    name: string;
+  };
   created_at: string;
-  updated_at: string;
+  updated_at?: string;
 }
 
 export interface ProductVariant {
   id: number;
-  product_id: number;
+  product_id?: number;
   name: string;
+  description?: string;
   price: number;
   stock: number;
+  sku?: string;
+  status: string;
+}
+
+export interface Review {
+  id: number;
+  rating: number;
+  comment: string;
+  user?: {
+    username: string;
+    full_name: string;
+  };
+  created_at: string;
 }
 
 export interface Order {
