@@ -14,7 +14,8 @@ interface User {
 interface AuthContextType {
   user: User | null;
   token: string | null;
-  login: (username: string, password: string) => Promise<boolean>;
+  initiateLogin: () => void;
+  handleCallback: (code: string) => Promise<boolean>;
   logout: () => void;
   loading: boolean;
   refreshUser: () => Promise<void>;
@@ -72,14 +73,42 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
-  const login = async (username: string, password: string): Promise<boolean> => {
+  const initiateLogin = () => {
+    // Tạo state để tránh CSRF
+    const state = btoa(Math.random().toString(36).substring(2, 15));
+    localStorage.setItem('oauth_state', state);
+    
+    // Lưu current URL để redirect về sau khi login
+    const currentUrl = window.location.href;
+    localStorage.setItem('pre_login_url', currentUrl);
+    
+    // Redirect đến trang đăng nhập chính
+    const shopId = process.env.NEXT_PUBLIC_SHOP_ID;
+    const redirectUrl = `${window.location.origin}/auth/callback`;
+    
+    const authUrl = `https://chommo.store/auth/authorize?` + new URLSearchParams({
+      response_type: 'code',
+      client_id: shopId!,
+      redirect_uri: redirectUrl,
+      scope: 'read_user read_balance',
+      state: state
+    });
+    
+    window.location.href = authUrl;
+  };
+
+  const handleCallback = async (code: string): Promise<boolean> => {
     try {
-      const response = await fetch(`${API_BASE}/auth/sso-login.php`, {
+      const response = await fetch(`${API_BASE}/auth/oauth-callback.php`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
         },
-        body: JSON.stringify({ username, password })
+        body: JSON.stringify({ 
+          code,
+          shop_id: process.env.NEXT_PUBLIC_SHOP_ID,
+          redirect_uri: `${window.location.origin}/auth/callback`
+        })
       });
 
       const data = await response.json();
@@ -90,11 +119,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         localStorage.setItem('chommo_token', data.token);
         return true;
       } else {
-        console.error('Login failed:', data.error);
+        console.error('OAuth callback failed:', data.error);
         return false;
       }
     } catch (error) {
-      console.error('Login error:', error);
+      console.error('OAuth callback error:', error);
       return false;
     }
   };
@@ -114,7 +143,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const value = {
     user,
     token,
-    login,
+    initiateLogin,
+    handleCallback,
     logout,
     loading,
     refreshUser
