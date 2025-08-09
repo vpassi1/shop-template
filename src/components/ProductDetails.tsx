@@ -44,7 +44,7 @@ export default function ProductDetails({ product }: ProductDetailsProps) {
 
   const getMaxQuantity = () => {
     const stock = getCurrentStock();
-    return Math.min(stock, 10); // Giới hạn tối đa 10 sản phẩm
+    return stock; // Giới hạn theo số lượng tồn kho thực tế
   };
 
   const handleVariantSelect = (variant: ProductVariant) => {
