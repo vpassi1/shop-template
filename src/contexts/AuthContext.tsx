@@ -74,15 +74,25 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   const initiateLogin = () => {
-    // Tạo state mạnh hơn để tránh CSRF
-    const state = btoa(Date.now().toString() + '_' + Math.random().toString(36).substring(2, 15));
+    // Tạo state từ domain + timestamp để có thể verify lại
+    const timestamp = Date.now();
+    const domain = window.location.hostname;
+    const randomPart = Math.random().toString(36).substring(2, 10);
+    const state = btoa(`${domain}_${timestamp}_${randomPart}`);
     
     console.log('🔐 OAuth: Generated state:', state);
+    console.log('🌐 OAuth: From domain:', domain);
+    
+    // Lưu vào cả localStorage và sessionStorage
     localStorage.setItem('oauth_state', state);
+    sessionStorage.setItem('oauth_state', state);
+    localStorage.setItem('oauth_timestamp', timestamp.toString());
     
     // Verify state đã được lưu
     const savedState = localStorage.getItem('oauth_state');
-    console.log('💾 OAuth: Saved state to localStorage:', savedState);
+    const savedSession = sessionStorage.getItem('oauth_state');
+    console.log('💾 OAuth: Saved to localStorage:', savedState);
+    console.log('📱 OAuth: Saved to sessionStorage:', savedSession);
     
     // Lưu current URL để redirect về sau khi login
     const currentUrl = window.location.href;

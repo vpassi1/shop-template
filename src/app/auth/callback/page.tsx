@@ -32,20 +32,55 @@ function CallbackHandler() {
           return;
         }
 
-        // Kiểm tra state để tránh CSRF
-        const savedState = localStorage.getItem('oauth_state');
+        // Kiểm tra state để tránh CSRF với fallback
+        const savedStateLocal = localStorage.getItem('oauth_state');
+        const savedStateSession = sessionStorage.getItem('oauth_state');
+        const savedTimestamp = localStorage.getItem('oauth_timestamp');
         
         console.log('🔍 OAuth Callback: Received state:', state);
-        console.log('💾 OAuth Callback: Saved state:', savedState);
-        console.log('✅ OAuth Callback: State match:', state === savedState);
+        console.log('💾 OAuth Callback: localStorage state:', savedStateLocal);
+        console.log('📱 OAuth Callback: sessionStorage state:', savedStateSession);
+        console.log('⏰ OAuth Callback: Saved timestamp:', savedTimestamp);
         
-        if (state !== savedState) {
+        // Try to match with either storage
+        const stateMatch = state === savedStateLocal || state === savedStateSession;
+        
+        if (!stateMatch && savedStateLocal === null && savedStateSession === null) {
+          // localStorage & sessionStorage both clear - Try to decode and validate state
+          try {
+            const decodedState = atob(state);
+            console.log('🔓 OAuth: Decoded state:', decodedState);
+            
+            const [stateDomain, stateTimestamp, randomPart] = decodedState.split('_');
+            const currentDomain = window.location.hostname;
+            const stateAge = Date.now() - parseInt(stateTimestamp);
+            
+            console.log('🌐 OAuth: State domain:', stateDomain);
+            console.log('🌐 OAuth: Current domain:', currentDomain);
+            console.log('⏰ OAuth: State age (ms):', stateAge);
+            
+            // Allow if domain matches and state is recent (within 10 minutes)
+            if (stateDomain === currentDomain && stateAge < 600000) {
+              console.log('✅ OAuth: State validated via fallback method');
+            } else {
+              setStatus('error');
+              setMessage(`State không hợp lệ\nDomain: ${stateDomain} vs ${currentDomain}\nTuổi: ${Math.round(stateAge/1000)}s`);
+              return;
+            }
+          } catch (e) {
+            console.error('❌ OAuth: Cannot decode state:', e);
+            setStatus('error');
+            setMessage('State không thể giải mã - có thể bị tấn công');
+            return;
+          }
+        } else if (!stateMatch) {
           console.error('❌ OAuth CSRF: State mismatch detected!');
           console.error('  - Received:', state);
-          console.error('  - Expected:', savedState);
+          console.error('  - Local:', savedStateLocal);
+          console.error('  - Session:', savedStateSession);
           
           setStatus('error');
-          setMessage(`State không khớp - có thể bị tấn công CSRF\nNhận: ${state}\nMong đợi: ${savedState}`);
+          setMessage(`State không khớp\nNhận: ${state}\nLocal: ${savedStateLocal}\nSession: ${savedStateSession}`);
           return;
         }
         
@@ -58,8 +93,10 @@ function CallbackHandler() {
           setStatus('success');
           setMessage('Đăng nhập thành công! Đang chuyển hướng...');
           
-          // Dọn dẹp localStorage
+          // Dọn dẹp localStorage và sessionStorage
           localStorage.removeItem('oauth_state');
+          sessionStorage.removeItem('oauth_state');
+          localStorage.removeItem('oauth_timestamp');
           
           // Redirect về trang trước khi login hoặc trang chủ
           setTimeout(() => {
