@@ -34,11 +34,22 @@ function CallbackHandler() {
 
         // Kiểm tra state để tránh CSRF
         const savedState = localStorage.getItem('oauth_state');
+        
+        console.log('🔍 OAuth Callback: Received state:', state);
+        console.log('💾 OAuth Callback: Saved state:', savedState);
+        console.log('✅ OAuth Callback: State match:', state === savedState);
+        
         if (state !== savedState) {
+          console.error('❌ OAuth CSRF: State mismatch detected!');
+          console.error('  - Received:', state);
+          console.error('  - Expected:', savedState);
+          
           setStatus('error');
-          setMessage('State không khớp - có thể bị tấn công CSRF');
+          setMessage(`State không khớp - có thể bị tấn công CSRF\nNhận: ${state}\nMong đợi: ${savedState}`);
           return;
         }
+        
+        console.log('✅ OAuth: State validation passed');
 
         // Xử lý authorization code
         const success = await handleCallback(code);

@@ -74,9 +74,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   const initiateLogin = () => {
-    // Tạo state để tránh CSRF
-    const state = btoa(Math.random().toString(36).substring(2, 15));
+    // Tạo state mạnh hơn để tránh CSRF
+    const state = btoa(Date.now().toString() + '_' + Math.random().toString(36).substring(2, 15));
+    
+    console.log('🔐 OAuth: Generated state:', state);
     localStorage.setItem('oauth_state', state);
+    
+    // Verify state đã được lưu
+    const savedState = localStorage.getItem('oauth_state');
+    console.log('💾 OAuth: Saved state to localStorage:', savedState);
     
     // Lưu current URL để redirect về sau khi login
     const currentUrl = window.location.href;
@@ -86,6 +92,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const shopId = process.env.NEXT_PUBLIC_SHOP_ID;
     const redirectUrl = `${window.location.origin}/auth/callback`;
     
+    console.log('🚀 OAuth: Starting flow with shop ID:', shopId);
+    console.log('🔗 OAuth: Redirect URL:', redirectUrl);
+    
     const authUrl = `https://chommo.store/auth/authorize?` + new URLSearchParams({
       response_type: 'code',
       client_id: shopId!,
@@ -94,6 +103,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       state: state
     });
     
+    console.log('🌐 OAuth: Authorization URL:', authUrl);
     window.location.href = authUrl;
   };
 
